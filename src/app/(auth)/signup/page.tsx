@@ -1,6 +1,9 @@
+import { requireUnAuth } from "@/lib/auth-utils";
 import { Signup } from '@/components/auth/signup'
 
-const SignupPage = () => {
+const SignupPage = async () => {
+  await requireUnAuth();
+  
   return <Signup />
 }
 

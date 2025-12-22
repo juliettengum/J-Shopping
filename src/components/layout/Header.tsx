@@ -7,10 +7,13 @@ import { MenuIcon, ShoppingCart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import MenuDropdown from "@/components/menu-dropdown";
 import MenuNavigation from "@/components/menu-navigation";
 import type { NavigationSection } from "@/components/menu-navigation";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { UserMenu } from "@/components/user-menu";
+import { authClient } from "@/lib/auth-client";
 
 import { cn } from "@/lib/utils";
 
@@ -23,6 +26,7 @@ type HeaderProps = {
 
 const Header = ({ navigationData, className }: HeaderProps) => {
   const [isScrolled, setIsScrolled] = useState(false);
+  const { data: session, isPending } = authClient.useSession();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -68,7 +72,7 @@ const Header = ({ navigationData, className }: HeaderProps) => {
             className="relative rounded-lg"
             asChild
           >
-            <a href="/cart">
+            <Link href="/cart">
               <ShoppingCart className="h-5 w-5" />
               <Badge
                 className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
@@ -77,16 +81,22 @@ const Header = ({ navigationData, className }: HeaderProps) => {
                 0
               </Badge>
               <span className="sr-only">Shopping Cart</span>
-            </a>
+            </Link>
           </Button>
 
           {/* Theme Switcher */}
           <ThemeSwitcher />
 
-          {/* Login Button */}
-          <Button className="rounded-lg" asChild>
-            <a href="/login">Login</a>
-          </Button>
+          {/* User Menu or Login Button */}
+          {isPending ? (
+            <Skeleton className="h-10 w-10 rounded-full" />
+          ) : session?.user ? (
+            <UserMenu user={session.user} />
+          ) : (
+            <Button className="rounded-md" asChild>
+              <Link href="/login">Login</Link>
+            </Button>
+          )}
         </div>
 
         {/* Mobile Actions */}
@@ -113,10 +123,16 @@ const Header = ({ navigationData, className }: HeaderProps) => {
           {/* Theme Switcher */}
           <ThemeSwitcher />
 
-          {/* Login Button */}
-          <Button className="rounded-lg" asChild>
-            <Link href="/login">Login</Link>
-          </Button>
+          {/* User Menu or Login Button */}
+          {isPending ? (
+            <Skeleton className="h-10 w-10 rounded-full" />
+          ) : session?.user ? (
+            <UserMenu user={session.user} />
+          ) : (
+            <Button className="rounded-lg" asChild>
+              <Link href="/login">Login</Link>
+            </Button>
+          )}
 
           {/* Menu Dropdown */}
           <MenuDropdown

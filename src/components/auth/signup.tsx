@@ -5,13 +5,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 import Logo from "@/components/layout/Logo";
 import AuthLines from "@/components/auth/assets/svg/auth-lines";
 import { SignupForm } from "@/components/auth/signup-form";
 import Link from "next/link";
+import { GoogleSigninButton } from "./google-signin-button";
 
 export const Signup = () => {
   return (
@@ -38,15 +38,7 @@ export const Signup = () => {
 
         <CardContent>
           <div className="mb-6 flex items-center gap-2.5">
-            <Button variant="outline" className="grow" asChild>
-              <a href="#">
-                <img
-                  src="https://cdn.shadcnstudio.com/ss-assets/brand-logo/google-icon.png"
-                  alt="google icon"
-                  className="size-5"
-                />
-              </a>
-            </Button>
+            <GoogleSigninButton />
           </div>
 
           <div className="mb-6 flex items-center gap-4">

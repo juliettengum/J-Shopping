@@ -12,6 +12,7 @@ import Logo from "@/components/layout/Logo";
 import AuthLines from "@/components/auth/assets/svg/auth-lines";
 import LoginForm from "@/components/auth/login-form";
 import Link from "next/link";
+import { GoogleSigninButton } from "./google-signin-button";
 
 const Login = () => {
   return (
@@ -36,15 +37,7 @@ const Login = () => {
 
         <CardContent>
           <div className="mb-6 flex items-center gap-2.5">
-            <Button variant="outline" className="grow" asChild>
-              <a href="#">
-                <img
-                  src="https://cdn.shadcnstudio.com/ss-assets/brand-logo/google-icon.png"
-                  alt="google icon"
-                  className="size-5"
-                />
-              </a>
-            </Button>
+          <GoogleSigninButton />          
           </div>
 
           <div className="mb-6 flex items-center gap-4">

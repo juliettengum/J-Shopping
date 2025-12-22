@@ -1,3 +1,4 @@
+import { requireAuth } from "@/lib/auth-utils";
 import { OrderSummary } from '@/features/order-summary/components/order-summary'
 
 const products = [
@@ -30,13 +31,15 @@ const products = [
   }
 ]
 
-const OrderSummaryPage = () => {
+const OrderSummaryPage = async () => {
+  const session = await requireAuth();
+
   return (
     <OrderSummary
       data={products}
-      customerName='Christine Johnson'
+      customerName={session.user.name}
       customerAddress='Street 91, Empire State, 350 Fifth Avenue, New York'
-      customerMail='christine@gmail.com'
+      customerMail={session.user.email}
       customerNote='This durable and portable insulated tumbler will keep your beverages at the perfect temperature for
                   hours.'
     />
