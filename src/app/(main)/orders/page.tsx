@@ -1,49 +1,60 @@
+import Link from "next/link";
+import { Package } from "lucide-react";
 import { requireAuth } from "@/lib/auth-utils";
-import { OrderSummary } from '@/features/order-summary/components/order-summary'
+import { getOrders, getOrderByNumber } from "@/actions/orders";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { OrdersAccordion } from "./orders-accordion";
 
-const products = [
-  {
-    id: 'diorShoes',
-    name: 'DIOR KAWS B33',
-    category: 'sneaker',
-    size: '6',
-    quantity: 1,
-    price: 120,
-    image: 'https://cdn.shadcnstudio.com/ss-assets/blocks/ecommerce/order-summary/image-12.png'
-  },
-  {
-    id: 'riderBag',
-    name: 'Mini Rider 2.0 bag',
-    category: 'bag',
-    size: 'M',
-    quantity: 1,
-    price: 300,
-    image: 'https://cdn.shadcnstudio.com/ss-assets/blocks/ecommerce/order-summary/image-11.png'
-  },
-  {
-    id: 'diorJacket',
-    name: 'Dior Oblique Cardigan',
-    category: 'jacket',
-    size: 'M',
-    quantity: 1,
-    price: 89,
-    image: 'https://cdn.shadcnstudio.com/ss-assets/blocks/ecommerce/order-summary/image-10.png'
-  }
-]
-
-const OrderSummaryPage = async () => {
+const OrdersPage = async () => {
   const session = await requireAuth();
+  const orders = await getOrders();
+
+  if (orders.length === 0) {
+    return (
+      <div className="container mx-auto px-4 py-16">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <Package className="size-16 text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold mb-2">No orders yet</h2>
+            <p className="text-muted-foreground mb-6">
+              Start shopping to see your orders here
+            </p>
+            <Button asChild>
+              <Link href="/products">Browse Products</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Fetch full details for all orders
+  const ordersWithItems = await Promise.all(
+    orders.map(async (order) => {
+      const orderWithItems = await getOrderByNumber(order.orderNumber);
+      return orderWithItems;
+    })
+  );
+
+  const validOrders = ordersWithItems.filter((order) => order !== null);
 
   return (
-    <OrderSummary
-      data={products}
-      customerName={session.user.name}
-      customerAddress='Street 91, Empire State, 350 Fifth Avenue, New York'
-      customerMail={session.user.email}
-      customerNote='This durable and portable insulated tumbler will keep your beverages at the perfect temperature for
-                  hours.'
-    />
-  )
-}
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">My Orders</h1>
+        <p className="text-muted-foreground mt-2">
+          View and manage your order history
+        </p>
+      </div>
 
-export default OrderSummaryPage
+      <OrdersAccordion
+        orders={validOrders}
+        customerName={session.user.name}
+        customerEmail={session.user.email}
+      />
+    </div>
+  );
+};
+
+export default OrdersPage;

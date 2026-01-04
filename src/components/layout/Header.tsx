@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { MenuIcon, ShoppingCart } from "lucide-react";
+import { MenuIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CartBadge } from "@/components/cart/cart-badge";
 import MenuDropdown from "@/components/menu-dropdown";
 import MenuNavigation from "@/components/menu-navigation";
 import type { NavigationSection } from "@/components/menu-navigation";
@@ -66,23 +66,7 @@ const Header = ({ navigationData, className }: HeaderProps) => {
         {/* Desktop Actions */}
         <div className="flex items-center gap-3 max-md:hidden">
           {/* Cart Icon */}
-          <Button
-            variant="outline"
-            size="icon"
-            className="relative rounded-lg"
-            asChild
-          >
-            <Link href="/cart">
-              <ShoppingCart className="h-5 w-5" />
-              <Badge
-                className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-                variant="destructive"
-              >
-                0
-              </Badge>
-              <span className="sr-only">Shopping Cart</span>
-            </Link>
-          </Button>
+          <CartBadge />
 
           {/* Theme Switcher */}
           <ThemeSwitcher />
@@ -102,23 +86,7 @@ const Header = ({ navigationData, className }: HeaderProps) => {
         {/* Mobile Actions */}
         <div className="flex items-center gap-3 md:hidden">
           {/* Cart Icon */}
-          <Button
-            variant="outline"
-            size="icon"
-            className="relative rounded-lg"
-            asChild
-          >
-            <Link href="/cart">
-              <ShoppingCart className="h-5 w-5" />
-              <Badge
-                className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-                variant="destructive"
-              >
-                0
-              </Badge>
-              <span className="sr-only">Shopping Cart</span>
-            </Link>
-          </Button>
+          <CartBadge />
 
           {/* Theme Switcher */}
           <ThemeSwitcher />

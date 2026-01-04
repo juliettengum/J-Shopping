@@ -1,14 +1,15 @@
 "use client";
 
-import { useId, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 import {
   StarIcon,
-  ShoppingCartIcon,
   HeartIcon,
   TruckIcon,
   RefreshCcwIcon,
+  MinusIcon,
+  PlusIcon,
 } from "lucide-react";
 
 import {
@@ -22,19 +23,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   type CarouselApi,
 } from "@/components/ui/carousel";
+import {
+  AddToCartButton,
+  type ProductForCart,
+} from "@/components/cart/add-to-cart-button";
 
 import { cn } from "@/lib/utils";
 
 type ProductDetailsProps = {
   productItems: {
     name: string;
+    slug: string;
     description: string;
     totalReview: number;
     rating: number;
@@ -49,14 +54,17 @@ type ProductDetailsProps = {
       label: string;
       href?: string;
     }>;
+    // Cart-related data
+    productId: number;
+    stockQuantity: number;
+    inStock: boolean;
   }[];
 };
 
 export const ProductDetails = ({ productItems }: ProductDetailsProps) => {
-  const id = useId();
-
   const [selectedImage, setSelectedImage] = useState(0);
   const [api, setApi] = useState<CarouselApi>();
+  const [quantity, setQuantity] = useState(1);
 
   // Sync carousel with thumbnail selection
   useEffect(() => {
@@ -214,12 +222,61 @@ export const ProductDetails = ({ productItems }: ProductDetailsProps) => {
                 <p className="text-muted-foreground">{item.description}</p>
                 <Separator />
 
+                {/* Quantity Selector */}
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium">Quantity:</span>
+                  <div className="flex items-center border rounded-lg">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 rounded-r-none"
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      disabled={quantity <= 1}
+                    >
+                      <MinusIcon className="size-4" />
+                    </Button>
+                    <span className="w-12 text-center font-medium">
+                      {quantity}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 rounded-l-none"
+                      onClick={() =>
+                        setQuantity((q) => Math.min(item.stockQuantity, q + 1))
+                      }
+                      disabled={quantity >= item.stockQuantity}
+                    >
+                      <PlusIcon className="size-4" />
+                    </Button>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {item.stockQuantity} available
+                  </span>
+                </div>
+
                 {/* Action Buttons */}
                 <div className="flex gap-6">
-                  <Button size="lg" className="grow">
-                    <ShoppingCartIcon />
-                    Add to Cart
-                  </Button>
+                  <AddToCartButton
+                    product={
+                      {
+                        productId: item.productId,
+                        name: item.name,
+                        slug: item.slug,
+                        price: finalPrice,
+                        originalPrice: originalPrice,
+                        image: item.images[0]?.src || "",
+                        maxStock: item.stockQuantity,
+                        inStock: item.inStock,
+                      } as ProductForCart
+                    }
+                    quantity={quantity}
+                    showIcon
+                    showText
+                    size="lg"
+                    className="grow"
+                    onSuccess={() => setQuantity(1)}
+                  />
                   <Button size="lg" variant="secondary" className="grow">
                     <HeartIcon />
                     Wish List

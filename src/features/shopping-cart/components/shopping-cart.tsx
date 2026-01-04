@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
 
-import { ClockIcon, Trash2Icon } from "lucide-react";
+import { Trash2Icon, ShoppingBag, ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -29,238 +29,216 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useCartStore } from "@/stores/cart-store";
 
-const FREE_DELIVERY_THRESHOLD = 50;
-const DELIVERY_FEE = 60;
-const DEFAULT_TAX_PERCENTAGE = 10;
+export function ShoppingCart() {
+  const items = useCartStore((state) => state.items);
+  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const removeItem = useCartStore((state) => state.removeItem);
 
-type ShoppingCartProps = {
-  cartItems: {
-    id: number;
-    name: string;
-    size: string;
-    price: number;
-    image: string;
-  }[];
-  taxPercentage?: number;
-};
-
-export function ShoppingCart({
-  cartItems,
-  taxPercentage = DEFAULT_TAX_PERCENTAGE,
-}: ShoppingCartProps) {
-  const [quantities, setQuantities] = useState<Record<number, number>>(() => {
-    const initialQuantities: Record<number, number> = {};
-
-    cartItems.forEach((item) => {
-      initialQuantities[item.id] = 1;
-    });
-
-    return initialQuantities;
-  });
-
-  const [deletedItems, setDeletedItems] = useState<Set<number>>(new Set());
   const [openPopovers, setOpenPopovers] = useState<Record<number, boolean>>({});
 
-  const handleQuantityChange = (itemId: number, value: string) => {
-    const newQuantity = Math.max(1, parseInt(value) || 1);
-
-    setQuantities((prev) => ({
-      ...prev,
-      [itemId]: newQuantity,
-    }));
-  };
-
-  const handleDeleteItem = (itemId: number) => {
-    setDeletedItems((prev) => new Set([...prev, itemId]));
-  };
-
-  // Filter out deleted items
-  const activeCartItems = cartItems.filter(
-    (item) => !deletedItems.has(item.id)
+  // Calculate subtotal
+  const subtotal = items.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0
   );
 
-  const subtotal = activeCartItems.reduce((total: number, item) => {
-    return total + item.price * (quantities[item.id] || 1);
-  }, 0);
-
-  const tax = (subtotal * taxPercentage) / 100;
-  const delivery =
-    activeCartItems.length === 0 || subtotal > FREE_DELIVERY_THRESHOLD
-      ? 0
-      : DELIVERY_FEE;
-  const deliveryLabel = delivery === 0 ? "Free Delivery" : `$${delivery}`;
-
-  const total = subtotal + tax + delivery;
+  // Generate quantity options based on maxStock
+  const getQuantityOptions = (maxStock: number) => {
+    const max = Math.min(maxStock, 10); // Cap at 10 for UI
+    return Array.from({ length: max }, (_, i) => i + 1);
+  };
 
   return (
     <section className="bg-muted py-8 sm:py-16 lg:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Left Column - cartItems */}
-          <div className="space-y-3 px-6 lg:col-span-2">
+          {/* Left Column - Cart Items */}
+          <div className="space-y-3 lg:col-span-2">
             <div className="flex w-full items-center justify-between">
-              <div className="text-2xl font-semibold">Your Cart</div>
-              <div className="text-muted-foreground">
-                {activeCartItems.length} Items in cart
-              </div>
+              <h1 className="text-2xl font-semibold">Your Cart</h1>
+              <p className="text-muted-foreground">
+                {items.length} {items.length === 1 ? "Item" : "Items"} in cart
+              </p>
             </div>
-            {activeCartItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="text-muted-foreground text-lg font-medium">
+
+            {items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="flex size-20 items-center justify-center rounded-full bg-muted-foreground/10 mb-4">
+                  <ShoppingBag className="size-10 text-muted-foreground" />
+                </div>
+                <h2 className="text-xl font-semibold mb-2">
                   Your cart is empty
-                </div>
-                <div className="text-muted-foreground mt-2 text-sm">
-                  Refresh the page to restore items
-                </div>
+                </h2>
+                <p className="text-muted-foreground mb-6 max-w-sm">
+                  Looks like you haven&apos;t added anything to your cart yet.
+                  Start shopping to fill it up!
+                </p>
+                <Button asChild>
+                  <Link href="/products">
+                    Continue Shopping
+                    <ArrowRight className="ml-2 size-4" />
+                  </Link>
+                </Button>
               </div>
             ) : (
-              activeCartItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex gap-6 border-t pt-7 pb-4 max-sm:flex-col sm:items-center"
-                >
-                  <div className="flex grow items-center gap-4">
-                    <Label className="group relative cursor-pointer">
-                      <Checkbox
-                        defaultChecked
-                        className="absolute start-2 top-2 hidden size-6 group-hover:block hover:border-black data-[state=checked]:block"
-                      />
-                      <div className="size-25">
-                        <img
+              <div className="space-y-4">
+                {items.map((item) => (
+                  <div
+                    key={item.productId}
+                    className="flex gap-4 sm:gap-6 border-t pt-6 pb-4 max-sm:flex-col"
+                  >
+                    {/* Product Image & Info */}
+                    <div className="flex grow items-start gap-4">
+                      <Link
+                        href={`/products/${item.productId}`}
+                        className="relative size-24 sm:size-28 shrink-0 overflow-hidden rounded-lg bg-background"
+                      >
+                        <Image
                           src={item.image}
                           alt={item.name}
-                          className="rounded-md object-cover"
+                          fill
+                          className="object-cover"
+                          sizes="112px"
                         />
-                      </div>
-                    </Label>
+                      </Link>
 
-                    <div className="space-y-4">
-                      <div className="flex flex-col gap-2">
-                        <h3 className="font-medium">{item.name}</h3>
-                        <p className="text-muted-foreground">
-                          Size: {item.size}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <ClockIcon className="size-5" />
-                        <p className="text-muted-foreground text-sm">
-                          7 days return Available
-                        </p>
+                      <div className="space-y-2 flex-1 min-w-0">
+                        <Link
+                          href={`/products/${item.productId}`}
+                          className="block"
+                        >
+                          <h3 className="font-medium line-clamp-2 hover:underline">
+                            {item.name}
+                          </h3>
+                        </Link>
+                        <div className="flex items-center gap-2 text-sm">
+                          {item.price < item.originalPrice && (
+                            <span className="text-muted-foreground line-through">
+                              ${item.originalPrice.toFixed(2)}
+                            </span>
+                          )}
+                          <span className="font-semibold">
+                            ${item.price.toFixed(2)}
+                          </span>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Quantity, Price, Delete */}
+                    <div className="flex items-center gap-4 sm:gap-8 max-sm:justify-between">
+                      <Select
+                        value={item.quantity.toString()}
+                        onValueChange={(value) =>
+                          updateQuantity(item.productId, parseInt(value))
+                        }
+                      >
+                        <SelectTrigger className="w-20 shadow-none">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getQuantityOptions(item.maxStock).map((qty) => (
+                            <SelectItem key={qty} value={qty.toString()}>
+                              {qty}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <p className="text-lg font-semibold min-w-[80px] text-right">
+                        ${(item.price * item.quantity).toFixed(2)}
+                      </p>
+
+                      <Popover
+                        open={openPopovers[item.productId] || false}
+                        onOpenChange={(open) =>
+                          setOpenPopovers((prev) => ({
+                            ...prev,
+                            [item.productId]: open,
+                          }))
+                        }
+                      >
+                        <PopoverTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Trash2Icon className="size-5" />
+                            <span className="sr-only">Remove item</span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72">
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10">
+                              <Trash2Icon className="text-destructive size-5" />
+                            </div>
+                            <p className="text-center font-medium">
+                              Remove this item from cart?
+                            </p>
+                            <div className="grid w-full grid-cols-2 gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setOpenPopovers((prev) => ({
+                                    ...prev,
+                                    [item.productId]: false,
+                                  }))
+                                }
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                  removeItem(item.productId);
+                                  setOpenPopovers((prev) => ({
+                                    ...prev,
+                                    [item.productId]: false,
+                                  }));
+                                }}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-12">
-                    <Select
-                      value={quantities[item.id]?.toString() || "1"}
-                      onValueChange={(value) =>
-                        handleQuantityChange(item.id, value)
-                      }
-                    >
-                      <SelectTrigger className="w-25 shadow-none">
-                        <SelectValue placeholder="Quantity" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1</SelectItem>
-                        <SelectItem value="2">2</SelectItem>
-                        <SelectItem value="3">3</SelectItem>
-                        <SelectItem value="4">4</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-lg font-semibold">
-                      ${(item.price * (quantities[item.id] || 1)).toFixed(2)}
-                    </p>
-                    <Popover
-                      open={openPopovers[item.id] || false}
-                      onOpenChange={(open) =>
-                        setOpenPopovers((prev) => ({
-                          ...prev,
-                          [item.id]: open,
-                        }))
-                      }
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="cursor-pointer"
-                        >
-                          <Trash2Icon className="size-6" />
-                          <span className="sr-only">Delete Item</span>
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80">
-                        <div className="flex flex-col items-center gap-4">
-                          <div className="flex aspect-square size-12 items-center justify-center rounded-full bg-red-500/10">
-                            <Trash2Icon className="text-destructive size-6" />
-                          </div>
-                          <div className="text-center font-semibold text-balance">
-                            Are you sure you want to remove this item
-                          </div>
-                          <div className="grid w-full grid-cols-2 gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() =>
-                                setOpenPopovers((prev) => ({
-                                  ...prev,
-                                  [item.id]: false,
-                                }))
-                              }
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => {
-                                handleDeleteItem(item.id);
-                                setOpenPopovers((prev) => ({
-                                  ...prev,
-                                  [item.id]: false,
-                                }));
-                              }}
-                            >
-                              Delete Item
-                            </Button>
-                          </div>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
-          {/* Right Column - Payment */}
+
+          {/* Right Column - Order Summary */}
           <div className="space-y-6">
-            <Card className="w-full max-w-md border-0 shadow-none">
+            <Card className="w-full border-0 shadow-none">
               <CardHeader>
                 <CardTitle className="text-xl">Apply Coupon</CardTitle>
-                <CardDescription className="text-base">
-                  Using a Promo Code ?
-                </CardDescription>
+                <CardDescription>Have a promo code?</CardDescription>
               </CardHeader>
               <CardContent>
-                <form>
-                  <div className="flex grow gap-3 sm:justify-end">
-                    <Input
-                      type="text"
-                      placeholder="Coupon Code"
-                      className="w-full max-w-xs"
-                    />
-                    <Button className="rounded-lg" type="submit">
-                      Apply
-                    </Button>
-                  </div>
+                <form
+                  onSubmit={(e) => e.preventDefault()}
+                  className="flex gap-3"
+                >
+                  <Input
+                    type="text"
+                    placeholder="Enter code"
+                    className="flex-1"
+                  />
+                  <Button type="submit" variant="outline">
+                    Apply
+                  </Button>
                 </form>
               </CardContent>
             </Card>
-            <Card className="w-full max-w-md gap-8 border-0 shadow-none">
-              <CardContent>
+
+            <Card className="w-full border-0 shadow-none">
+              <CardContent className="pt-6">
                 <div className="space-y-6">
-                  <h5 className="text-xl font-semibold"> Price Details</h5>
-                  <div className="space-y-5">
+                  <h2 className="text-xl font-semibold">Order Summary</h2>
+                  <div className="space-y-4">
                     <Separator />
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Subtotal</span>
@@ -268,48 +246,52 @@ export function ShoppingCart({
                         ${subtotal.toFixed(2)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">
-                        Tax
-                        <span className="text-muted-foreground ms-0.5 text-xs">
-                          {taxPercentage}%
-                        </span>
-                      </span>
-                      <span className="font-medium">+${tax.toFixed(2)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Shipping</span>
-                      <span className="font-medium">{deliveryLabel}</span>
-                    </div>
                     <Separator />
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-semibold">Total</span>
-                      <span className="font-medium">${total.toFixed(2)}</span>
+                      <span className="text-lg font-semibold">
+                        ${subtotal.toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex-col items-start gap-3.5">
-                <Button type="submit" className="w-full">
-                  Confirm Payment
+              <CardFooter className="flex-col gap-4">
+                <Button
+                  className="w-full"
+                  size="lg"
+                  disabled={items.length === 0}
+                  asChild={items.length > 0}
+                >
+                  {items.length > 0 ? (
+                    <Link href="/checkout">Proceed to Checkout</Link>
+                  ) : (
+                    "Proceed to Checkout"
+                  )}
                 </Button>
-                <div className="flex items-center gap-2">
-                  <p>We Accept:</p>
-                  <div className="flex items-center gap-4">
-                    <img
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>We accept:</span>
+                  <div className="flex items-center gap-3">
+                    <Image
                       src="https://cdn.shadcnstudio.com/ss-assets/brand-logo/visa.png"
                       alt="Visa"
-                      className="h-4"
+                      width={32}
+                      height={16}
+                      className="h-4 w-auto"
                     />
-                    <img
+                    <Image
                       src="https://cdn.shadcnstudio.com/ss-assets/brand-logo/paypal-icon.png"
                       alt="PayPal"
-                      className="h-4"
+                      width={32}
+                      height={16}
+                      className="h-4 w-auto"
                     />
-                    <img
+                    <Image
                       src="https://cdn.shadcnstudio.com/ss-assets/brand-logo/master.png"
                       alt="Mastercard"
-                      className="h-4"
+                      width={32}
+                      height={16}
+                      className="h-4 w-auto"
                     />
                   </div>
                 </div>

@@ -2,8 +2,9 @@ import { Hero } from "@/components/layout/home/hero";
 import { ProductCategories } from "@/components/layout/home/product-categories";
 import { ProductList } from "@/components/layout/home/popular-products";
 import { BackgroundRippleEffect } from "@/components/ui/background-ripple-effect";
-import { productCategories } from "@/data/categories";
 import { AboutUs } from "@/components/layout/home/about-us";
+import { getCategoriesWithProductCount } from "@/actions/categories";
+import { getFeaturedProducts } from "@/actions/products";
 
 const avatars = [
   {
@@ -58,7 +59,20 @@ const logos = [
 ]
 
 
-export default function Home() {
+export default async function Home() {
+  // Fetch data from database
+  const categories = await getCategoriesWithProductCount();
+  const featuredProducts = await getFeaturedProducts(8);
+
+  // Transform categories to match component props (show first 4)
+  const categoryData = categories.slice(0, 4).map((cat) => ({
+    img: cat.image || "",
+    title: cat.name,
+    productNumber: cat.productCount,
+    productLink: `/categories/${cat.slug}`,
+    slug: cat.slug,
+  }));
+
   return (
     <div className="flex min-h-screen flex-col bg-background relative">
       <div className="absolute inset-0 overflow-hidden">
@@ -66,8 +80,8 @@ export default function Home() {
       </div>
       <div className="relative z-10">
         <Hero />
-        <ProductCategories productCategories={productCategories.slice(0, 4)} />
-        <ProductList />
+        <ProductCategories productCategories={categoryData} />
+        <ProductList products={featuredProducts} />
         <AboutUs avatars={avatars} logos={logos} />
       </div>
     </div>

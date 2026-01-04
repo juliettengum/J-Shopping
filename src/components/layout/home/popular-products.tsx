@@ -1,11 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
-import { HeartIcon, StarIcon, ShoppingCart, Search } from "lucide-react";
+import { HeartIcon, StarIcon, Search } from "lucide-react";
 
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,11 +16,16 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { allProducts, type Product } from "@/data/products";
+import {
+  AddToCartButton,
+  type ProductForCart,
+} from "@/components/cart/add-to-cart-button";
 
-export function ProductList() {
-  // Show first 8 popular products
-  const products = allProducts.slice(0, 8);
+type ProductListProps = {
+  products: any[]; // Products from database
+};
+
+export function ProductList({ products }: ProductListProps) {
   return (
     <section className="py-8 sm:py-16 lg:py-24">
       <Carousel
@@ -108,7 +114,7 @@ export function ProductList() {
                       </Link>
                       <Badge className="bg-amber-600/10 text-amber-600 focus-visible:ring-amber-600/20 focus-visible:outline-none dark:bg-amber-400/10 dark:text-amber-400 dark:focus-visible:ring-amber-400/40 shrink-0">
                         <StarIcon className="size-3" />
-                        {product.rating}
+                        {parseFloat(product.rating)}
                       </Badge>
                     </div>
 
@@ -116,29 +122,38 @@ export function ProductList() {
                       <Link href={`/products/${product.id}`} className="flex-1">
                         {!product.discountedPrice && (
                           <span className="text-2xl font-semibold">
-                            ${product.originalPrice.toFixed(2)}
+                            ${parseFloat(product.originalPrice).toFixed(2)}
                           </span>
                         )}
 
                         {product.discountedPrice && (
                           <div className="flex items-center gap-2">
                             <span className="text-2xl font-semibold">
-                              ${product.discountedPrice.toFixed(2)}
+                              ${parseFloat(product.discountedPrice).toFixed(2)}
                             </span>
                             <span className="text-muted-foreground line-through text-sm">
-                              ${product.originalPrice.toFixed(2)}
+                              ${parseFloat(product.originalPrice).toFixed(2)}
                             </span>
                           </div>
                         )}
                       </Link>
-                      <Button
-                        size="icon"
-                        variant="default"
+                      <AddToCartButton
+                        product={
+                          {
+                            productId: product.id,
+                            name: product.name,
+                            slug: product.slug,
+                            price: product.discountedPrice
+                              ? parseFloat(product.discountedPrice)
+                              : parseFloat(product.originalPrice),
+                            originalPrice: parseFloat(product.originalPrice),
+                            image: product.bannerImage,
+                            maxStock: product.stockQuantity,
+                            inStock: product.inStock,
+                          } as ProductForCart
+                        }
                         className="rounded-lg shrink-0"
-                        aria-label="Add to cart"
-                      >
-                        <ShoppingCart className="size-4" />
-                      </Button>
+                      />
                     </div>
                   </CardContent>
                 </Card>

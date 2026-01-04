@@ -121,7 +121,7 @@ export function OrderSummary({
           <CardFooter className='justify-between gap-6 border-t max-sm:flex-col max-sm:items-start'>
             <div className='space-y-2.5 text-lg'>
               <p className='font-medium'>Thank you for shopping with us!</p>
-              <span className='text-muted-foreground font-semibold'>Team shadcn/studio</span>
+              <span className='text-muted-foreground font-semibold'>Jshopping</span>
             </div>
             <Button size='lg'>Track Order</Button>
           </CardFooter>
