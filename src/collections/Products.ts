@@ -31,6 +31,19 @@ export const Products: CollectionConfig = {
         if (operation === "update" && data?.name && !data.slug) {
           data.slug = slugify(data.name);
         }
+
+        // If inStock is true, ensure stockQuantity is at least 1
+        if (data?.inStock === true) {
+          if (!data.stockQuantity || data.stockQuantity < 1) {
+            data.stockQuantity = 1;
+          }
+        }
+
+        // If stockQuantity is 0 or less, set inStock to false
+        if (data?.stockQuantity !== undefined && data.stockQuantity <= 0) {
+          data.inStock = false;
+        }
+
         return data;
       },
     ],

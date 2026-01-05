@@ -15,23 +15,24 @@ export const Media: CollectionConfig = {
   upload: {
     staticDir: "media",
     mimeTypes: ["image/*"],
+    displayPreview: true,
     imageSizes: [
       {
         name: "thumbnail",
-        width: 300,
-        height: 300,
+        width: 400,
+        height: 400,
         position: "centre",
       },
       {
         name: "card",
-        width: 600,
-        height: 600,
+        width: 768,
+        height: 768,
         position: "centre",
       },
       {
         name: "banner",
-        width: 1200,
-        height: 800,
+        width: 1920,
+        height: 1080,
         position: "centre",
       },
     ],
