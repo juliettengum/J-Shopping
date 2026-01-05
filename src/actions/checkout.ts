@@ -59,7 +59,11 @@ export async function createCheckoutSession(
     const lineItems = items.map((item) => {
       // Convert image URL to absolute if it's relative
       let imageUrl = item.image;
-      if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("/")) {
+      if (
+        imageUrl &&
+        typeof imageUrl === "string" &&
+        imageUrl.startsWith("/")
+      ) {
         imageUrl = `${appUrl}${imageUrl}`;
       }
 
