@@ -1,10 +1,9 @@
 "use server";
 
 import { headers } from "next/headers";
-import { db } from "@/db";
-import { orders, orderItems } from "@/db/schema";
+import { getPayload } from "payload";
+import config from "@payload-config";
 import { auth } from "@/lib/auth";
-import { eq, desc } from "drizzle-orm";
 
 export async function getOrders() {
   const session = await auth.api.getSession({
@@ -15,13 +14,29 @@ export async function getOrders() {
     return [];
   }
 
-  const userOrders = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.userId, session.user.id))
-    .orderBy(desc(orders.createdAt));
+  const payload = await getPayload({ config });
 
-  return userOrders;
+  const result = await payload.find({
+    collection: "orders",
+    where: {
+      userId: { equals: session.user.id },
+    },
+    sort: "-createdAt",
+    limit: 100,
+  });
+
+  return result.docs.map((order) => ({
+    id: order.id,
+    userId: order.userId,
+    orderNumber: order.orderNumber,
+    totalAmount: String(order.totalAmount),
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    paymentIntentId: order.paymentIntentId,
+    shippingAddress: order.shippingAddress,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+  }));
 }
 
 export async function getOrderByNumber(orderNumber: string) {
@@ -33,30 +48,116 @@ export async function getOrderByNumber(orderNumber: string) {
     return null;
   }
 
-  const [order] = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.orderNumber, orderNumber))
-    .limit(1);
+  const payload = await getPayload({ config });
 
-  if (!order || order.userId !== session.user.id) {
+  const orderResult = await payload.find({
+    collection: "orders",
+    where: {
+      orderNumber: { equals: orderNumber },
+    },
+    limit: 1,
+  });
+
+  if (orderResult.docs.length === 0) return null;
+
+  const order = orderResult.docs[0];
+
+  // Verify the order belongs to the current user
+  if (order.userId !== session.user.id) {
     return null;
   }
 
-  const items = await db
-    .select()
-    .from(orderItems)
-    .where(eq(orderItems.orderId, order.id));
+  // Get order items
+  const itemsResult = await payload.find({
+    collection: "order-items",
+    where: {
+      order: { equals: order.id },
+    },
+    depth: 1,
+    limit: 100,
+  });
 
   return {
-    ...order,
-    items,
+    id: order.id,
+    userId: order.userId,
+    orderNumber: order.orderNumber,
+    totalAmount: String(order.totalAmount),
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    paymentIntentId: order.paymentIntentId,
+    shippingAddress: order.shippingAddress,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+    items: itemsResult.docs.map((item) => ({
+      id: item.id,
+      orderId: typeof item.order === "number" ? item.order : item.order?.id,
+      productId: typeof item.product === "number" ? item.product : item.product?.id,
+      productName: item.productName,
+      productImage: item.productImage,
+      quantity: item.quantity,
+      unitPrice: String(item.unitPrice),
+      subtotal: String(item.subtotal),
+      createdAt: item.createdAt,
+    })),
   };
 }
 
+export async function getOrdersWithItems() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
+  if (!session?.user) {
+    return [];
+  }
 
+  const payload = await getPayload({ config });
 
+  const ordersResult = await payload.find({
+    collection: "orders",
+    where: {
+      userId: { equals: session.user.id },
+    },
+    sort: "-createdAt",
+    limit: 100,
+  });
 
+  // Get items for all orders
+  const ordersWithItems = await Promise.all(
+    ordersResult.docs.map(async (order) => {
+      const itemsResult = await payload.find({
+        collection: "order-items",
+        where: {
+          order: { equals: order.id },
+        },
+        limit: 100,
+      });
 
+      return {
+        id: order.id,
+        userId: order.userId,
+        orderNumber: order.orderNumber,
+        totalAmount: String(order.totalAmount),
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        paymentIntentId: order.paymentIntentId,
+        shippingAddress: order.shippingAddress,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        items: itemsResult.docs.map((item) => ({
+          id: item.id,
+          orderId: typeof item.order === "number" ? item.order : item.order?.id,
+          productId: typeof item.product === "number" ? item.product : item.product?.id,
+          productName: item.productName,
+          productImage: item.productImage,
+          quantity: item.quantity,
+          unitPrice: String(item.unitPrice),
+          subtotal: String(item.subtotal),
+          createdAt: item.createdAt,
+        })),
+      };
+    })
+  );
 
+  return ordersWithItems;
+}

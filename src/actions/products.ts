@@ -1,218 +1,247 @@
 "use server";
 
-import { db } from "@/db";
-import { products, categories } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { getPayload } from "payload";
+import config from "@payload-config";
+import type { Media, Product, Category } from "@/payload-types";
+
+// =============================================================================
+// HELPER: EXTRACT IMAGE URL FROM MEDIA
+// =============================================================================
+
+function getImageUrl(media: Media | number | null | undefined): string | null {
+  if (!media) return null;
+  if (typeof media === "number") return null; // Not populated
+  return media.url || null;
+}
+
+function getImagesUrls(images: Product["images"]): string[] {
+  if (!images || !Array.isArray(images)) return [];
+  
+  return images
+    .map((item) => {
+      const media = item.image;
+      if (!media || typeof media === "number") return null;
+      return media.url || null;
+    })
+    .filter((url): url is string => url !== null);
+}
+
+// =============================================================================
+// HELPER: FORMAT PRODUCT FOR FRONTEND
+// =============================================================================
+
+function formatProduct(product: Product) {
+  const category = product.category as Category | null;
+  
+  return {
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    description: product.description,
+    bannerImage: getImageUrl(product.bannerImage as Media),
+    images: getImagesUrls(product.images),
+    categoryId: category?.id || null,
+    originalPrice: String(product.originalPrice),
+    discountedPrice: product.discountedPrice ? String(product.discountedPrice) : null,
+    stockQuantity: product.stockQuantity,
+    inStock: product.inStock,
+    rating: String(product.rating || 0),
+    createdAt: product.createdAt,
+    updatedAt: product.updatedAt,
+    category: category
+      ? {
+          id: category.id,
+          name: category.name,
+          slug: category.slug,
+        }
+      : null,
+  };
+}
+
+// =============================================================================
+// PRODUCT QUERIES
+// =============================================================================
 
 /**
  * Get all products
  */
 export async function getAllProducts() {
-  return await db
-    .select({
-      id: products.id,
-      name: products.name,
-      slug: products.slug,
-      description: products.description,
-      bannerImage: products.bannerImage,
-      images: products.images,
-      categoryId: products.categoryId,
-      originalPrice: products.originalPrice,
-      discountedPrice: products.discountedPrice,
-      stockQuantity: products.stockQuantity,
-      inStock: products.inStock,
-      rating: products.rating,
-      createdAt: products.createdAt,
-      category: {
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
-      },
-    })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .orderBy(desc(products.createdAt));
+  const payload = await getPayload({ config });
+
+  const result = await payload.find({
+    collection: "products",
+    sort: "-createdAt",
+    limit: 100,
+    depth: 2, // Include category and media relations
+  });
+
+  return result.docs.map(formatProduct);
 }
 
 /**
  * Get single product by ID
  */
 export async function getProductById(id: number) {
-  const result = await db
-    .select({
-      id: products.id,
-      name: products.name,
-      slug: products.slug,
-      description: products.description,
-      bannerImage: products.bannerImage,
-      images: products.images,
-      categoryId: products.categoryId,
-      originalPrice: products.originalPrice,
-      discountedPrice: products.discountedPrice,
-      stockQuantity: products.stockQuantity,
-      inStock: products.inStock,
-      rating: products.rating,
-      createdAt: products.createdAt,
-      updatedAt: products.updatedAt,
-      category: {
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
-      },
-    })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(eq(products.id, id))
-    .limit(1);
+  const payload = await getPayload({ config });
 
-  return result[0] || null;
+  try {
+    const product = await payload.findByID({
+      collection: "products",
+      id,
+      depth: 2,
+    });
+
+    return formatProduct(product);
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Get single product by slug
  */
 export async function getProductBySlug(slug: string) {
-  const result = await db
-    .select({
-      id: products.id,
-      name: products.name,
-      slug: products.slug,
-      description: products.description,
-      bannerImage: products.bannerImage,
-      images: products.images,
-      categoryId: products.categoryId,
-      originalPrice: products.originalPrice,
-      discountedPrice: products.discountedPrice,
-      stockQuantity: products.stockQuantity,
-      inStock: products.inStock,
-      rating: products.rating,
-      createdAt: products.createdAt,
-      updatedAt: products.updatedAt,
-      category: {
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
-      },
-    })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(eq(products.slug, slug))
-    .limit(1);
+  const payload = await getPayload({ config });
 
-  return result[0] || null;
+  const result = await payload.find({
+    collection: "products",
+    where: {
+      slug: { equals: slug },
+    },
+    limit: 1,
+    depth: 2,
+  });
+
+  if (result.docs.length === 0) return null;
+
+  return formatProduct(result.docs[0]);
 }
 
 /**
  * Get products by category ID
  */
 export async function getProductsByCategoryId(categoryId: number) {
-  return await db
-    .select({
-      id: products.id,
-      name: products.name,
-      slug: products.slug,
-      description: products.description,
-      bannerImage: products.bannerImage,
-      images: products.images,
-      categoryId: products.categoryId,
-      originalPrice: products.originalPrice,
-      discountedPrice: products.discountedPrice,
-      stockQuantity: products.stockQuantity,
-      inStock: products.inStock,
-      rating: products.rating,
-      createdAt: products.createdAt,
-    })
-    .from(products)
-    .where(eq(products.categoryId, categoryId))
-    .orderBy(desc(products.createdAt));
+  const payload = await getPayload({ config });
+
+  const result = await payload.find({
+    collection: "products",
+    where: {
+      category: { equals: categoryId },
+    },
+    sort: "-createdAt",
+    limit: 100,
+    depth: 2,
+  });
+
+  return result.docs.map(formatProduct);
 }
 
 /**
  * Get products by category slug
  */
 export async function getProductsByCategorySlug(categorySlug: string) {
-  return await db
-    .select({
-      id: products.id,
-      name: products.name,
-      slug: products.slug,
-      description: products.description,
-      bannerImage: products.bannerImage,
-      images: products.images,
-      categoryId: products.categoryId,
-      originalPrice: products.originalPrice,
-      discountedPrice: products.discountedPrice,
-      stockQuantity: products.stockQuantity,
-      inStock: products.inStock,
-      rating: products.rating,
-      createdAt: products.createdAt,
-      category: {
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
-      },
-    })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(eq(categories.slug, categorySlug))
-    .orderBy(desc(products.createdAt));
+  const payload = await getPayload({ config });
+
+  const categoryResult = await payload.find({
+    collection: "categories",
+    where: {
+      slug: { equals: categorySlug },
+    },
+    limit: 1,
+  });
+
+  if (categoryResult.docs.length === 0) return [];
+
+  const categoryId = categoryResult.docs[0].id;
+
+  const result = await payload.find({
+    collection: "products",
+    where: {
+      category: { equals: categoryId },
+    },
+    sort: "-createdAt",
+    limit: 100,
+    depth: 2,
+  });
+
+  return result.docs.map(formatProduct);
 }
 
 /**
  * Get products that are in stock
  */
 export async function getInStockProducts() {
-  return await db
-    .select({
-      id: products.id,
-      name: products.name,
-      slug: products.slug,
-      description: products.description,
-      bannerImage: products.bannerImage,
-      images: products.images,
-      categoryId: products.categoryId,
-      originalPrice: products.originalPrice,
-      discountedPrice: products.discountedPrice,
-      stockQuantity: products.stockQuantity,
-      inStock: products.inStock,
-      rating: products.rating,
-      createdAt: products.createdAt,
-    })
-    .from(products)
-    .where(eq(products.inStock, true))
-    .orderBy(desc(products.createdAt));
+  const payload = await getPayload({ config });
+
+  const result = await payload.find({
+    collection: "products",
+    where: {
+      inStock: { equals: true },
+    },
+    sort: "-createdAt",
+    limit: 100,
+    depth: 2,
+  });
+
+  return result.docs.map(formatProduct);
 }
 
 /**
  * Get featured/popular products (e.g., highest rated, limited to 10)
  */
 export async function getFeaturedProducts(limit: number = 10) {
-  return await db
-    .select({
-      id: products.id,
-      name: products.name,
-      slug: products.slug,
-      description: products.description,
-      bannerImage: products.bannerImage,
-      images: products.images,
-      categoryId: products.categoryId,
-      originalPrice: products.originalPrice,
-      discountedPrice: products.discountedPrice,
-      stockQuantity: products.stockQuantity,
-      inStock: products.inStock,
-      rating: products.rating,
-      createdAt: products.createdAt,
-      category: {
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
-      },
-    })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(eq(products.inStock, true))
-    .orderBy(desc(products.rating))
-    .limit(limit);
+  const payload = await getPayload({ config });
+
+  const result = await payload.find({
+    collection: "products",
+    where: {
+      inStock: { equals: true },
+    },
+    sort: "-rating",
+    limit,
+    depth: 2,
+  });
+
+  return result.docs.map(formatProduct);
 }
 
+/**
+ * Get multiple products by IDs (for cart/checkout)
+ */
+export async function getProductsByIds(ids: number[]) {
+  const payload = await getPayload({ config });
 
+  const result = await payload.find({
+    collection: "products",
+    where: {
+      id: { in: ids },
+    },
+    limit: ids.length,
+    depth: 2,
+  });
+
+  return result.docs.map(formatProduct);
+}
+
+/**
+ * Update product stock (used by webhook)
+ */
+export async function updateProductStock(productId: number, quantityToDeduct: number) {
+  const payload = await getPayload({ config });
+
+  const product = await payload.findByID({
+    collection: "products",
+    id: productId,
+  });
+
+  const newStock = Math.max(0, (product.stockQuantity || 0) - quantityToDeduct);
+
+  await payload.update({
+    collection: "products",
+    id: productId,
+    data: {
+      stockQuantity: newStock,
+      inStock: newStock > 0,
+    },
+  });
+}

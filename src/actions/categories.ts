@@ -1,122 +1,194 @@
 "use server";
 
-import { db } from "@/db";
-import { categories, products } from "@/db/schema";
-import { eq, sql, desc } from "drizzle-orm";
+import { getPayload } from "payload";
+import config from "@payload-config";
+import type { Media, Category, Product } from "@/payload-types";
+
+// =============================================================================
+// HELPER: EXTRACT IMAGE URL FROM MEDIA
+// =============================================================================
+
+function getImageUrl(media: Media | number | null | undefined): string | null {
+  if (!media) return null;
+  if (typeof media === "number") return null; // Not populated
+  return media.url || null;
+}
+
+function getProductImageUrl(bannerImage: Product["bannerImage"]): string | null {
+  if (!bannerImage) return null;
+  if (typeof bannerImage === "number") return null;
+  return bannerImage.url || null;
+}
+
+function getProductImagesUrls(images: Product["images"]): string[] {
+  if (!images || !Array.isArray(images)) return [];
+  
+  return images
+    .map((item) => {
+      const media = item.image;
+      if (!media || typeof media === "number") return null;
+      return media.url || null;
+    })
+    .filter((url): url is string => url !== null);
+}
+
+// =============================================================================
+// HELPER: FORMAT CATEGORY FOR FRONTEND
+// =============================================================================
+
+function formatCategory(category: Category) {
+  return {
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    description: category.description,
+    image: getImageUrl(category.image as Media),
+    createdAt: category.createdAt,
+    updatedAt: category.updatedAt,
+  };
+}
+
+// =============================================================================
+// CATEGORY QUERIES
+// =============================================================================
 
 /**
  * Get all categories
  */
 export async function getAllCategories() {
-  return await db
-    .select({
-      id: categories.id,
-      name: categories.name,
-      slug: categories.slug,
-      description: categories.description,
-      image: categories.image,
-      createdAt: categories.createdAt,
-    })
-    .from(categories)
-    .orderBy(desc(categories.createdAt));
+  const payload = await getPayload({ config });
+
+  const result = await payload.find({
+    collection: "categories",
+    sort: "-createdAt",
+    limit: 100,
+    depth: 1, // Include media relation
+  });
+
+  return result.docs.map(formatCategory);
 }
 
 /**
  * Get single category by ID
  */
 export async function getCategoryById(id: number) {
-  const result = await db
-    .select({
-      id: categories.id,
-      name: categories.name,
-      slug: categories.slug,
-      description: categories.description,
-      image: categories.image,
-      createdAt: categories.createdAt,
-      updatedAt: categories.updatedAt,
-    })
-    .from(categories)
-    .where(eq(categories.id, id))
-    .limit(1);
+  const payload = await getPayload({ config });
 
-  return result[0] || null;
+  try {
+    const category = await payload.findByID({
+      collection: "categories",
+      id,
+      depth: 1,
+    });
+
+    return formatCategory(category);
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Get single category by slug
  */
 export async function getCategoryBySlug(slug: string) {
-  const result = await db
-    .select({
-      id: categories.id,
-      name: categories.name,
-      slug: categories.slug,
-      description: categories.description,
-      image: categories.image,
-      createdAt: categories.createdAt,
-      updatedAt: categories.updatedAt,
-    })
-    .from(categories)
-    .where(eq(categories.slug, slug))
-    .limit(1);
+  const payload = await getPayload({ config });
 
-  return result[0] || null;
+  const result = await payload.find({
+    collection: "categories",
+    where: {
+      slug: { equals: slug },
+    },
+    limit: 1,
+    depth: 1,
+  });
+
+  if (result.docs.length === 0) return null;
+
+  return formatCategory(result.docs[0]);
 }
 
 /**
  * Get all categories with product count
  */
 export async function getCategoriesWithProductCount() {
-  return await db
-    .select({
-      id: categories.id,
-      name: categories.name,
-      slug: categories.slug,
-      description: categories.description,
-      image: categories.image,
-      createdAt: categories.createdAt,
-      productCount: sql<number>`cast(count(${products.id}) as int)`,
+  const payload = await getPayload({ config });
+
+  const categories = await payload.find({
+    collection: "categories",
+    sort: "-createdAt",
+    limit: 100,
+    depth: 1,
+  });
+
+  const categoriesWithCounts = await Promise.all(
+    categories.docs.map(async (cat) => {
+      const products = await payload.find({
+        collection: "products",
+        where: {
+          category: { equals: cat.id },
+        },
+        limit: 0,
+      });
+
+      return {
+        ...formatCategory(cat),
+        productCount: products.totalDocs,
+      };
     })
-    .from(categories)
-    .leftJoin(products, eq(categories.id, products.categoryId))
-    .groupBy(categories.id)
-    .orderBy(desc(categories.createdAt));
+  );
+
+  return categoriesWithCounts;
 }
 
 /**
  * Get category with its products
  */
 export async function getCategoryWithProducts(slug: string) {
-  // First get the category
-  const category = await getCategoryBySlug(slug);
+  const payload = await getPayload({ config });
 
-  if (!category) {
-    return null;
-  }
+  const categoryResult = await payload.find({
+    collection: "categories",
+    where: {
+      slug: { equals: slug },
+    },
+    limit: 1,
+    depth: 1,
+  });
 
-  // Then get its products
-  const categoryProducts = await db
-    .select({
-      id: products.id,
-      name: products.name,
-      slug: products.slug,
-      description: products.description,
-      bannerImage: products.bannerImage,
-      images: products.images,
-      categoryId: products.categoryId,
-      originalPrice: products.originalPrice,
-      discountedPrice: products.discountedPrice,
-      stockQuantity: products.stockQuantity,
-      inStock: products.inStock,
-      rating: products.rating,
-      createdAt: products.createdAt,
-    })
-    .from(products)
-    .where(eq(products.categoryId, category.id))
-    .orderBy(desc(products.createdAt));
+  if (categoryResult.docs.length === 0) return null;
+
+  const category = categoryResult.docs[0];
+
+  const productsResult = await payload.find({
+    collection: "products",
+    where: {
+      category: { equals: category.id },
+    },
+    sort: "-createdAt",
+    limit: 100,
+    depth: 2,
+  });
 
   return {
-    category,
-    products: categoryProducts,
+    category: formatCategory(category),
+    products: productsResult.docs.map((product) => {
+      const cat = product.category as Category | null;
+      
+      return {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        description: product.description,
+        bannerImage: getProductImageUrl(product.bannerImage),
+        images: getProductImagesUrls(product.images),
+        categoryId: cat?.id || null,
+        originalPrice: String(product.originalPrice),
+        discountedPrice: product.discountedPrice ? String(product.discountedPrice) : null,
+        stockQuantity: product.stockQuantity,
+        inStock: product.inStock,
+        rating: String(product.rating || 0),
+        createdAt: product.createdAt,
+      };
+    }),
   };
 }

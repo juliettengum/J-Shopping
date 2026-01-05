@@ -1,8 +1,10 @@
 import type { Stripe } from "stripe";
 import { NextRequest, NextResponse } from "next/server";
+import { getPayload } from "payload";
+import config from "@payload-config";
 import { db } from "@/db";
-import { orders, orderItems, products, user } from "@/db/schema";
-import { eq, sql, inArray } from "drizzle-orm";
+import { user } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import {
   SessionMetadataSchema,
@@ -14,6 +16,17 @@ import {
   extractShippingAddress,
   centsToDollars,
 } from "@/features/stripe/api/utils";
+import type { Media } from "@/payload-types";
+
+// =============================================================================
+// HELPER: EXTRACT IMAGE URL
+// =============================================================================
+
+function getImageUrl(media: Media | number | null | undefined): string {
+  if (!media) return "";
+  if (typeof media === "number") return "";
+  return media.url || "";
+}
 
 // =============================================================================
 // WEBHOOK ROUTE
@@ -83,6 +96,8 @@ async function handleCheckoutCompleted(
 ): Promise<void> {
   console.log(`Processing: ${session.id}`);
 
+  const payload = await getPayload({ config });
+
   // ---------------------------------------------------------------------------
   // 3.1 PARSE METADATA
   // ---------------------------------------------------------------------------
@@ -107,7 +122,7 @@ async function handleCheckoutCompleted(
   }
 
   // ---------------------------------------------------------------------------
-  // 3.3 VERIFY USER
+  // 3.3 VERIFY USER (Better Auth user - still using Drizzle)
   // ---------------------------------------------------------------------------
   const existingUser = await db.query.user.findFirst({
     where: eq(user.id, userId),
@@ -118,14 +133,18 @@ async function handleCheckoutCompleted(
   }
 
   // ---------------------------------------------------------------------------
-  // 3.4 IDEMPOTENCY CHECK
+  // 3.4 IDEMPOTENCY CHECK (Using Payload)
   // ---------------------------------------------------------------------------
-  const existingOrder = await db.query.orders.findFirst({
-    where: eq(orders.paymentIntentId, session.id),
+  const existingOrderResult = await payload.find({
+    collection: "orders",
+    where: {
+      paymentIntentId: { equals: session.id },
+    },
+    limit: 1,
   });
 
-  if (existingOrder) {
-    console.log(`Order exists: ${existingOrder.orderNumber}`);
+  if (existingOrderResult.docs.length > 0) {
+    console.log(`Order exists: ${existingOrderResult.docs[0].orderNumber}`);
     return;
   }
 
@@ -141,14 +160,20 @@ async function handleCheckoutCompleted(
   }
 
   // ---------------------------------------------------------------------------
-  // 3.6 FETCH PRODUCTS FROM DATABASE
+  // 3.6 FETCH PRODUCTS FROM PAYLOAD
   // ---------------------------------------------------------------------------
   const productIds = cartItems.map((item) => item.id);
-  const productRecords = await db.query.products.findMany({
-    where: inArray(products.id, productIds),
+  
+  const productRecords = await payload.find({
+    collection: "products",
+    where: {
+      id: { in: productIds },
+    },
+    limit: productIds.length,
+    depth: 1, // Include media relations
   });
 
-  const productMap = new Map(productRecords.map((p) => [p.id, p]));
+  const productMap = new Map(productRecords.docs.map((p) => [p.id, p]));
 
   // ---------------------------------------------------------------------------
   // 3.7 EXTRACT SHIPPING
@@ -157,25 +182,31 @@ async function handleCheckoutCompleted(
   const totalAmount = centsToDollars(session.amount_total);
 
   // ---------------------------------------------------------------------------
-  // 3.8 CREATE ORDER
+  // 3.8 CREATE ORDER (Using Payload)
   // ---------------------------------------------------------------------------
-  const [newOrder] = await db
-    .insert(orders)
-    .values({
+  const newOrder = await payload.create({
+    collection: "orders",
+    data: {
       userId,
       orderNumber: generateOrderNumber(),
-      totalAmount: totalAmount.toFixed(2),
+      totalAmount,
       status: "processing",
       paymentStatus: "paid",
       paymentIntentId: session.id,
-      shippingAddress,
-    })
-    .returning();
+      shippingAddress: shippingAddress || {
+        line1: "",
+        city: "",
+        state: "",
+        postalCode: "",
+        country: "",
+      },
+    },
+  });
 
   console.log(`Order created: ${newOrder.orderNumber}`);
 
   // ---------------------------------------------------------------------------
-  // 3.9 CREATE ORDER ITEMS + UPDATE STOCK
+  // 3.9 CREATE ORDER ITEMS + UPDATE STOCK (Using Payload)
   // ---------------------------------------------------------------------------
   for (const item of cartItems) {
     const product = productMap.get(item.id);
@@ -185,32 +216,38 @@ async function handleCheckoutCompleted(
       continue;
     }
 
-    const unitPrice = product.discountedPrice
-      ? parseFloat(product.discountedPrice)
-      : parseFloat(product.originalPrice);
+    const unitPrice = product.discountedPrice || product.originalPrice;
 
-    if (product.stockQuantity < item.qty) {
+    if ((product.stockQuantity || 0) < item.qty) {
       console.error(
         `Low stock: ${product.name} (${product.stockQuantity} left)`
       );
     }
 
-    await db.insert(orderItems).values({
-      orderId: newOrder.id,
-      productId: product.id,
-      productName: product.name,
-      productImage: product.bannerImage,
-      quantity: item.qty,
-      unitPrice: unitPrice.toFixed(2),
-      subtotal: (unitPrice * item.qty).toFixed(2),
+    // Create order item
+    await payload.create({
+      collection: "order-items",
+      data: {
+        order: newOrder.id,
+        product: product.id,
+        productName: product.name,
+        productImage: getImageUrl(product.bannerImage as Media),
+        quantity: item.qty,
+        unitPrice,
+        subtotal: unitPrice * item.qty,
+      },
     });
 
-    await db
-      .update(products)
-      .set({
-        stockQuantity: sql`GREATEST(${products.stockQuantity} - ${item.qty}, 0)`,
-      })
-      .where(eq(products.id, product.id));
+    // Update product stock
+    const newStock = Math.max(0, (product.stockQuantity || 0) - item.qty);
+    await payload.update({
+      collection: "products",
+      id: product.id,
+      data: {
+        stockQuantity: newStock,
+        inStock: newStock > 0,
+      },
+    });
   }
 
   console.log(`Order completed: ${newOrder.orderNumber}`);
