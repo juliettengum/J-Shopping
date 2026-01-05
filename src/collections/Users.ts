@@ -6,10 +6,7 @@ export const Users: CollectionConfig = {
     useAsTitle: "email",
     defaultColumns: ["email", "name", "role", "createdAt"],
   },
-  auth: {
-    // Disable self-registration - only existing admins can create users
-    disableLocalStrategy: false,
-  },
+  auth: true,
   access: {
     // Only logged-in admins can read users list
     read: ({ req: { user } }) => !!user,

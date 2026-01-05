@@ -4,6 +4,11 @@ import { headers } from "next/headers";
 import { getPayload } from "payload";
 import config from "@payload-config";
 import { auth } from "@/lib/auth";
+import type { Order, OrderItem } from "@/payload-types";
+
+type OrderWithItems = Order & {
+  items: Array<Omit<OrderItem, 'order'> & { orderId?: number; productId?: number }>;
+};
 
 export async function getOrders() {
   const session = await auth.api.getSession({
@@ -25,8 +30,8 @@ export async function getOrders() {
     limit: 100,
   });
 
-  return result.docs.map((order) => ({
-    id: order.id,
+  return result.docs.map((order: any) => ({
+    id: order.id as number,
     userId: order.userId,
     orderNumber: order.orderNumber,
     totalAmount: String(order.totalAmount),
@@ -88,8 +93,8 @@ export async function getOrderByNumber(orderNumber: string) {
     shippingAddress: order.shippingAddress,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
-    items: itemsResult.docs.map((item) => ({
-      id: item.id,
+    items: itemsResult.docs.map((item: any) => ({
+      id: item.id as number,
       orderId: typeof item.order === "number" ? item.order : item.order?.id,
       productId: typeof item.product === "number" ? item.product : item.product?.id,
       productName: item.productName,
@@ -124,7 +129,7 @@ export async function getOrdersWithItems() {
 
   // Get items for all orders
   const ordersWithItems = await Promise.all(
-    ordersResult.docs.map(async (order) => {
+    ordersResult.docs.map(async (order: any) => {
       const itemsResult = await payload.find({
         collection: "order-items",
         where: {
@@ -134,30 +139,30 @@ export async function getOrdersWithItems() {
       });
 
       return {
-        id: order.id,
+        id: order.id as number,
         userId: order.userId,
         orderNumber: order.orderNumber,
-        totalAmount: String(order.totalAmount),
+        totalAmount: order.totalAmount,
         status: order.status,
         paymentStatus: order.paymentStatus,
         paymentIntentId: order.paymentIntentId,
         shippingAddress: order.shippingAddress,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
-        items: itemsResult.docs.map((item) => ({
-          id: item.id,
+        items: itemsResult.docs.map((item: any) => ({
+          id: item.id as number,
           orderId: typeof item.order === "number" ? item.order : item.order?.id,
           productId: typeof item.product === "number" ? item.product : item.product?.id,
           productName: item.productName,
           productImage: item.productImage,
           quantity: item.quantity,
-          unitPrice: String(item.unitPrice),
-          subtotal: String(item.subtotal),
+          unitPrice: item.unitPrice,
+          subtotal: item.subtotal,
           createdAt: item.createdAt,
         })),
       };
     })
   );
 
-  return ordersWithItems;
+  return ordersWithItems as any;
 }

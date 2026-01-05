@@ -8,9 +8,9 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'cdn.shadcnstudio.com',
-        pathname: '/ss-assets/**',
+        protocol: "https",
+        hostname: "cdn.shadcnstudio.com",
+        pathname: "/ss-assets/**",
       },
     ],
   },

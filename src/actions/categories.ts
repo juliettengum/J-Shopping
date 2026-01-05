@@ -65,7 +65,7 @@ export async function getAllCategories() {
     depth: 1, // Include media relation
   });
 
-  return result.docs.map(formatCategory);
+  return result.docs.map((cat) => formatCategory(cat as Category));
 }
 
 /**
@@ -81,7 +81,7 @@ export async function getCategoryById(id: number) {
       depth: 1,
     });
 
-    return formatCategory(category);
+    return formatCategory(category as Category);
   } catch {
     return null;
   }
@@ -104,7 +104,7 @@ export async function getCategoryBySlug(slug: string) {
 
   if (result.docs.length === 0) return null;
 
-  return formatCategory(result.docs[0]);
+  return formatCategory(result.docs[0] as Category);
 }
 
 /**
@@ -121,7 +121,7 @@ export async function getCategoriesWithProductCount() {
   });
 
   const categoriesWithCounts = await Promise.all(
-    categories.docs.map(async (cat) => {
+    (categories.docs as Category[]).map(async (cat) => {
       const products = await payload.find({
         collection: "products",
         where: {
@@ -157,7 +157,7 @@ export async function getCategoryWithProducts(slug: string) {
 
   if (categoryResult.docs.length === 0) return null;
 
-  const category = categoryResult.docs[0];
+  const category = categoryResult.docs[0] as Category;
 
   const productsResult = await payload.find({
     collection: "products",
@@ -171,7 +171,7 @@ export async function getCategoryWithProducts(slug: string) {
 
   return {
     category: formatCategory(category),
-    products: productsResult.docs.map((product) => {
+    products: (productsResult.docs as Product[]).map((product) => {
       const cat = product.category as Category | null;
       
       return {

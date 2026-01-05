@@ -49,7 +49,7 @@ const OrdersPage = async () => {
       </div>
 
       <OrdersAccordion
-        orders={validOrders}
+        orders={validOrders as any}
         customerName={session.user.name}
         customerEmail={session.user.email}
       />

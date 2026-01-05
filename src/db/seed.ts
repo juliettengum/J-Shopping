@@ -70,9 +70,9 @@ async function uploadOrGetMedia(
     });
 
     // Cache the result
-    mediaCache.set(imageUrl, media.id);
+    mediaCache.set(imageUrl, media.id as number);
     
-    return media.id;
+    return media.id as number;
   } finally {
     // Cleanup temp file
     if (fs.existsSync(tempPath)) {
@@ -174,7 +174,7 @@ async function seed() {
         },
       });
 
-      categoryMap.set(category.slug, createdCategory.id);
+      categoryMap.set(category.slug, createdCategory.id as number);
       console.log(`   ✓ ${category.title} (ID: ${createdCategory.id})`);
     }
 

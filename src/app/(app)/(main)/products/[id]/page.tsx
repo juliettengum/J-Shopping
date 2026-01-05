@@ -61,7 +61,7 @@ export default async function ProductDetailsPage({ params }: PageProps) {
       // Cart-related data
       productId: product.id,
       stockQuantity: product.stockQuantity,
-      inStock: product.inStock,
+      inStock: product.inStock ?? true,
     },
   ];
 

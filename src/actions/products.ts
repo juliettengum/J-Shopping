@@ -75,7 +75,7 @@ export async function getAllProducts() {
     depth: 2, // Include category and media relations
   });
 
-  return result.docs.map(formatProduct);
+  return result.docs.map((p) => formatProduct(p as Product));
 }
 
 /**
@@ -91,7 +91,7 @@ export async function getProductById(id: number) {
       depth: 2,
     });
 
-    return formatProduct(product);
+    return formatProduct(product as Product);
   } catch {
     return null;
   }
@@ -114,7 +114,7 @@ export async function getProductBySlug(slug: string) {
 
   if (result.docs.length === 0) return null;
 
-  return formatProduct(result.docs[0]);
+  return formatProduct(result.docs[0] as Product);
 }
 
 /**
@@ -133,7 +133,7 @@ export async function getProductsByCategoryId(categoryId: number) {
     depth: 2,
   });
 
-  return result.docs.map(formatProduct);
+  return result.docs.map((p) => formatProduct(p as Product));
 }
 
 /**
@@ -164,7 +164,7 @@ export async function getProductsByCategorySlug(categorySlug: string) {
     depth: 2,
   });
 
-  return result.docs.map(formatProduct);
+  return result.docs.map((p) => formatProduct(p as Product));
 }
 
 /**
@@ -183,7 +183,7 @@ export async function getInStockProducts() {
     depth: 2,
   });
 
-  return result.docs.map(formatProduct);
+  return result.docs.map((p) => formatProduct(p as Product));
 }
 
 /**
@@ -202,7 +202,7 @@ export async function getFeaturedProducts(limit: number = 10) {
     depth: 2,
   });
 
-  return result.docs.map(formatProduct);
+  return result.docs.map((p) => formatProduct(p as Product));
 }
 
 /**
@@ -220,7 +220,7 @@ export async function getProductsByIds(ids: number[]) {
     depth: 2,
   });
 
-  return result.docs.map(formatProduct);
+  return result.docs.map((p) => formatProduct(p as Product));
 }
 
 /**
