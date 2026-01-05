@@ -53,20 +53,29 @@ export async function createCheckoutSession(
   // ---------------------------------------------------------------------------
   // 3. BUILD LINE ITEMS
   // ---------------------------------------------------------------------------
-  const lineItems = items.map((item) => ({
-    price_data: {
-      currency: "usd",
-      product_data: {
-        name: item.name,
-        images: [item.image],
-        metadata: {
-          productId: item.productId.toString(),
+  const lineItems = items.map((item) => {
+    // Validate image URL - Stripe requires valid HTTPS URLs
+    const isValidImageUrl =
+      item.image &&
+      typeof item.image === "string" &&
+      (item.image.startsWith("https://") || item.image.startsWith("http://"));
+
+    return {
+      price_data: {
+        currency: "usd",
+        product_data: {
+          name: item.name,
+          // Only include images array if we have a valid URL
+          ...(isValidImageUrl ? { images: [item.image] } : {}),
+          metadata: {
+            productId: item.productId.toString(),
+          },
         },
+        unit_amount: dollarsToCents(item.price),
       },
-      unit_amount: dollarsToCents(item.price),
-    },
-    quantity: item.quantity,
-  }));
+      quantity: item.quantity,
+    };
+  });
 
   // ---------------------------------------------------------------------------
   // 4. CREATE STRIPE SESSION
