@@ -28,86 +28,73 @@ type CheckoutResult =
 export async function createCheckoutSession(
   input: CheckoutInput
 ): Promise<CheckoutResult> {
-  // ---------------------------------------------------------------------------
-  // 1. AUTHENTICATE USER
-  // ---------------------------------------------------------------------------
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  try {
+    // ---------------------------------------------------------------------------
+    // 1. AUTHENTICATE USER
+    // ---------------------------------------------------------------------------
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
 
-  if (!session?.user) {
-    return { success: false, error: "Please log in to checkout" };
-  }
-
-  // ---------------------------------------------------------------------------
-  // 2. VALIDATE INPUT
-  // ---------------------------------------------------------------------------
-  const validation = CheckoutInputSchema.safeParse(input);
-
-  if (!validation.success) {
-    return { success: false, error: validation.error.issues[0].message };
-  }
-
-  const { items } = validation.data;
-
-  // ---------------------------------------------------------------------------
-  // 3. BUILD LINE ITEMS
-  // ---------------------------------------------------------------------------
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
-
-  const lineItems = items.map((item) => {
-    // Convert image URL to absolute if it's relative
-    let imageUrl = item.image;
-    if (imageUrl && typeof imageUrl === "string") {
-      if (imageUrl.startsWith("/")) {
-        // Relative URL - prepend app URL
-        imageUrl = `${appUrl}${imageUrl}`;
-      }
+    if (!session?.user) {
+      return { success: false, error: "Please log in to checkout" };
     }
 
-    // Validate image URL - Stripe requires valid HTTPS URLs
-    const isValidImageUrl =
-      imageUrl &&
-      typeof imageUrl === "string" &&
-      (imageUrl.startsWith("https://") || imageUrl.startsWith("http://"));
+    // ---------------------------------------------------------------------------
+    // 2. VALIDATE INPUT
+    // ---------------------------------------------------------------------------
+    const validation = CheckoutInputSchema.safeParse(input);
 
-    return {
-      price_data: {
-        currency: "usd",
-        product_data: {
-          name: item.name,
-          // Only include images array if we have a valid URL
-          ...(isValidImageUrl ? { images: [imageUrl] } : {}),
-          metadata: {
-            productId: item.productId.toString(),
+    if (!validation.success) {
+      return { success: false, error: validation.error.issues[0].message };
+    }
+
+    const { items } = validation.data;
+
+    // ---------------------------------------------------------------------------
+    // 3. BUILD LINE ITEMS
+    // ---------------------------------------------------------------------------
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+    const lineItems = items.map((item) => {
+      // Convert image URL to absolute if it's relative
+      let imageUrl = item.image;
+      if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("/")) {
+        imageUrl = `${appUrl}${imageUrl}`;
+      }
+
+      // Validate image URL - Stripe requires valid HTTPS URLs
+      const isValidImageUrl =
+        imageUrl &&
+        typeof imageUrl === "string" &&
+        (imageUrl.startsWith("https://") || imageUrl.startsWith("http://"));
+
+      return {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: item.name,
+            ...(isValidImageUrl ? { images: [imageUrl] } : {}),
+            metadata: {
+              productId: item.productId.toString(),
+            },
           },
+          unit_amount: dollarsToCents(item.price),
         },
-        unit_amount: dollarsToCents(item.price),
-      },
-      quantity: item.quantity,
-    };
-  });
+        quantity: item.quantity,
+      };
+    });
 
-  // ---------------------------------------------------------------------------
-  // 4. CREATE STRIPE SESSION
-  // ---------------------------------------------------------------------------
-  try {
-    // Compact cart data: only productId and quantity (fits in 500 char limit)
+    // ---------------------------------------------------------------------------
+    // 4. CREATE STRIPE SESSION
+    // ---------------------------------------------------------------------------
     const cartData = items.map((item) => ({
       id: item.productId,
       qty: item.quantity,
     }));
 
-    const successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/checkout/cancel`;
-
-    // Debug logging - remove after fixing
-    console.log("=== STRIPE CHECKOUT DEBUG ===");
-    console.log("APP_URL:", process.env.NEXT_PUBLIC_APP_URL);
-    console.log("Success URL:", successUrl);
-    console.log("Cancel URL:", cancelUrl);
-    console.log("Line items:", JSON.stringify(lineItems, null, 2));
-    console.log("=============================");
+    const successUrl = `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${appUrl}/checkout/cancel`;
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",

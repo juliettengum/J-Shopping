@@ -4,7 +4,7 @@ import { z } from "zod";
 export const CartItemSchema = z.object({
   productId: z.number().int().positive(),
   name: z.string().min(1),
-  image: z.string().url(),
+  image: z.string().min(1), // Can be relative path or full URL
   price: z.number().positive(),
   quantity: z.number().int().positive(),
 });
