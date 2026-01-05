@@ -53,12 +53,23 @@ export async function createCheckoutSession(
   // ---------------------------------------------------------------------------
   // 3. BUILD LINE ITEMS
   // ---------------------------------------------------------------------------
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+
   const lineItems = items.map((item) => {
+    // Convert image URL to absolute if it's relative
+    let imageUrl = item.image;
+    if (imageUrl && typeof imageUrl === "string") {
+      if (imageUrl.startsWith("/")) {
+        // Relative URL - prepend app URL
+        imageUrl = `${appUrl}${imageUrl}`;
+      }
+    }
+
     // Validate image URL - Stripe requires valid HTTPS URLs
     const isValidImageUrl =
-      item.image &&
-      typeof item.image === "string" &&
-      (item.image.startsWith("https://") || item.image.startsWith("http://"));
+      imageUrl &&
+      typeof imageUrl === "string" &&
+      (imageUrl.startsWith("https://") || imageUrl.startsWith("http://"));
 
     return {
       price_data: {
@@ -66,7 +77,7 @@ export async function createCheckoutSession(
         product_data: {
           name: item.name,
           // Only include images array if we have a valid URL
-          ...(isValidImageUrl ? { images: [item.image] } : {}),
+          ...(isValidImageUrl ? { images: [imageUrl] } : {}),
           metadata: {
             productId: item.productId.toString(),
           },
